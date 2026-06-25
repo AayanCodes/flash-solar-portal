@@ -1,0 +1,309 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Models
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      Role     @default(EMPLOYEE)
+  isActive  Boolean  @default(true)
+  profilePhoto String?
+  lastLogin DateTime?
+  
+  employee    Employee?
+  auditLogs   AuditLog[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+// Employee Models
+model Employee {
+  id              String  @id @default(cuid())
+  employeeId      String  @unique
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information
+  firstName       String
+  lastName        String
+  fatherName      String?
+  motherName      String?
+  gender          String?
+  dateOfBirth     DateTime?
+  bloodGroup      String?
+  maritalStatus   String?
+  nationality     String?
+  
+  // Contact Information
+  phone           String
+  alternatePhone  String?
+  email           String
+  permanentAddress String?
+  currentAddress  String?
+  
+  // Employment Information
+  joinDate        DateTime
+  department      String
+  designation     String
+  employmentType  String   @default("Full-Time")
+  experience      Int?
+  reportingManager String?
+  skills          String?
+  qualification   String?
+  
+  // Financial Information
+  baseSalary      Float
+  bankName        String?
+  accountNumber   String?
+  ifscCode        String?
+  upiId           String?
+  
+  // Documents
+  aadhaar         String?
+  pan             String?
+  passportNumber  String?
+  drivingLicense  String?
+  
+  // Status
+  status          EmployeeStatus @default(ACTIVE)
+  isDeleted       Boolean @default(false)
+  deletedAt       DateTime?
+  
+  // Relations
+  attendanceRecords Attendance[]
+  payrollRecords    Payroll[]
+  documents         EmployeeDocument[]
+  projectAssignments ProjectAssignment[]
+  auditLogs         AuditLog[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+model EmployeeDocument {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  documentType String
+  fileUrl      String
+  fileName     String
+  fileSize     Int?
+  uploadDate   DateTime @default(now())
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Attendance Models
+model Attendance {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date        DateTime
+  checkInTime DateTime?
+  checkOutTime DateTime?
+  status      AttendanceStatus @default(ABSENT)
+  latitude    Float?
+  longitude   Float?
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([employeeId, date])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+  WORK_FROM_HOME
+}
+
+// Payroll Models
+model Payroll {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  month       Int
+  year        Int
+  baseSalary  Float
+  allowances  Float   @default(0)
+  deductions  Float   @default(0)
+  overtimePay Float   @default(0)
+  bonusAmount Float   @default(0)
+  taxAmount   Float   @default(0)
+  netSalary   Float
+  status      PayrollStatus @default(PENDING)
+  paymentDate DateTime?
+  notes       String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+enum PayrollStatus {
+  PENDING
+  APPROVED
+  PAID
+  REJECTED
+}
+
+// Project Models
+model Project {
+  id              String   @id @default(cuid())
+  projectId       String   @unique
+  name            String
+  description     String?
+  clientName      String
+  clientContact   String?
+  location        String
+  startDate       DateTime
+  endDate         DateTime?
+  budget          Float
+  status          ProjectStatus @default(PLANNING)
+  progressPercentage Int @default(0)
+  notes           String?
+  
+  // Relations
+  assignments     ProjectAssignment[]
+  tasks           ProjectTask[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum ProjectStatus {
+  PLANNING
+  IN_PROGRESS
+  COMPLETED
+  ON_HOLD
+  CANCELLED
+}
+
+model ProjectAssignment {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  role        String
+  assignedDate DateTime @default(now())
+  status      String   @default("ACTIVE")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([projectId, employeeId])
+}
+
+model ProjectTask {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  priority    String     @default("MEDIUM")
+  dueDate     DateTime?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+// Lead/CRM Models
+model Lead {
+  id              String   @id @default(cuid())
+  name            String
+  email           String
+  phone           String
+  companyName     String?
+  serviceInterest String
+  source          LeadSource @default(WEBSITE)
+  status          LeadStatus @default(NEW)
+  followUpDate    DateTime?
+  notes           String?
+  convertedToCustomer Boolean @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  SOCIAL_MEDIA
+  EMAIL
+  PHONE_CALL
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL_SENT
+  NEGOTIATION
+  CONVERTED
+  LOST
+}
+
+// Audit Log
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeId  String?
+  
+  action      String
+  entityType  String
+  entityId    String
+  oldValues   String?  // JSON string
+  newValues   String?  // JSON string
+  ipAddress   String?
+  userAgent   String?
+  
+  createdAt   DateTime @default(now())
+}
